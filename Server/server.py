@@ -110,9 +110,17 @@ def predict():
         float(data['pupilPosition']),               
         float(data['index'])             
     ]
+    
     reshaped_data = [features]
-    prediction = et_model.predict(reshaped_data)
-    return jsonify({'prediction': int(prediction[0])})
+    class_probabilities = et_model.predict_proba(reshaped_data)[0]
+    predicted_class = et_model.predict(reshaped_data)[0]
+    
+    return jsonify({
+        'predicted_class': int(predicted_class),
+        'class_0_probability': float(class_probabilities[0]), 
+        'class_1_probability': float(class_probabilities[1])
+    })
+
 
 
 
