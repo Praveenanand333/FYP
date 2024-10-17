@@ -7,13 +7,14 @@ import joblib
 from tensorflow.keras.preprocessing import image
 from flask_cors import CORS
 import os
+from tensorflow.keras.preprocessing import image_dataset_from_directory
 app = Flask(__name__)
 CORS(app) 
 
 aq10_model=joblib.load("../Models/AQ10/rfmodel.joblib")
 #aq10_model = tf.keras.models.load_model("../Models/AQ10/ann.h5")
-eeg_model = joblib.load('../Models/EEG/svmmodel.joblib')
-image_model = tf.keras.models.load_model("../Models/Image/VGG19.h5")
+eeg_model = joblib.load('../Models/EEG/dtmodel.joblib')
+image_model = tf.keras.models.load_model("../Models/Image/EfficientNetB4.h5")
 et_model=joblib.load('../Models/ET/knn.joblib')
 feature_names = ['A1_Score', 'A2_Score', 'A3_Score', 'A4_Score', 'A5_Score', 'A6_Score',
        'A7_Score', 'A8_Score', 'A9_Score', 'A10_Score', 'age', 'gender',
@@ -58,9 +59,13 @@ def predict_eeg():
     probabilities = eeg_model.predict_proba(new_data)
     prediction = eeg_model.predict(new_data)
     class_probabilities = probabilities[0]
-    
+    eeg_class=1
+    print(class_probabilities)
+    print(prediction[0])
+    if(float(class_probabilities[0])>class_probabilities[1]):
+        eeg_class=0
     return jsonify({
-        'predicted_class': int(prediction[0]),      
+        'predicted_class': eeg_class,      
         'class_0_probability': float(class_probabilities[0]), 
         'class_1_probability': float(class_probabilities[1]) 
     })
@@ -71,26 +76,30 @@ def predict_image():
     file = request.files['file']
     temp_file_path = 'temp_image.jpg'  
     file.save(temp_file_path) 
+    img = image.load_img(temp_file_path, target_size=(224, 224)) 
+    img_tensor = image.img_to_array(img) 
+    img_tensor = np.expand_dims(img_tensor, axis=0)  
+    print(img_tensor.shape) 
 
-    img = image.load_img(temp_file_path, target_size=(224, 224))  
-    img_array = image.img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0)
-
-    predictions = image_model.predict(img_array)
+    predictions = image_model.predict(img_tensor) 
     predicted_class = np.argmax(predictions, axis=1)[0]
     class_probabilities = predictions[0]
-
-    os.remove(temp_file_path) 
-
+    print(class_probabilities)
+    os.remove(temp_file_path)  
+    img_class=0
+    if(float(class_probabilities[0])>float(class_probabilities[1])):
+        img_class=1
     return jsonify({
-        'predicted_class': int(predicted_class),
-        'class_0_probability': float(class_probabilities[0]), 
-        'class_1_probability': float(class_probabilities[1])
+        'predicted_class': img_class,
+        'class_0_probability': float(class_probabilities[1]), 
+        'class_1_probability': float(class_probabilities[0])
     })
+
 
 @app.route('/predict/et', methods=['POST'])
 def predict():
     data = request.json
+    print(data)
     features = [
         int(data['trial']),      
         int(data['stimulus']),   
